@@ -1,0 +1,547 @@
+@if (!authReady()) {
+  <main class="auth-loading">Verificando acceso...</main>
+} @else if (!session()) {
+  <main class="auth-page">
+    <section class="auth-card" aria-labelledby="login-title">
+      <img class="auth-logo" src="/hotel-solamar-inn.png" alt="Hotel Solamar Inn" />
+      <p class="eyebrow">Hotel Solamar Inn · Administración</p>
+      <h1 id="login-title">Iniciar sesión</h1>
+      <p class="muted">Acceso exclusivo para el administrador del sistema.</p>
+      @if (authError) {
+        <p class="connection-error" role="alert">{{ authError }}</p>
+      }
+      <form (ngSubmit)="signIn()">
+        <label>
+          Correo electrónico
+          <input name="authEmail" type="email" [(ngModel)]="authEmail" autocomplete="username" required />
+        </label>
+        <label>
+          Contraseña
+          <input name="authPassword" type="password" [(ngModel)]="authPassword" autocomplete="current-password" required />
+        </label>
+        <button type="submit" [disabled]="authSaving">
+          {{ authSaving ? 'Verificando...' : 'Entrar' }}
+        </button>
+      </form>
+    </section>
+  </main>
+} @else {
+<div class="app-layout">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="Hotel Solamar Inn, inicio">
+      <img src="/hotel-solamar-inn.png" alt="Hotel Solamar Inn" />
+    </a>
+    <div class="sidebar-title">
+      <strong>Solamar Inn</strong>
+      <span>Administración</span>
+    </div>
+    <nav aria-label="Navegación principal">
+      <button
+        class="nav-item"
+        [class.selected]="activeView() === 'dashboard'"
+        type="button"
+        (click)="showView('dashboard')"
+      >
+        <span class="nav-icon">⌂</span>
+        Dashboard
+      </button>
+      <button
+        class="nav-item"
+        [class.selected]="activeView() === 'employees'"
+        type="button"
+        (click)="showView('employees')"
+      >
+        <span class="nav-icon">♙</span>
+        Lista de empleados
+      </button>
+      <button
+        class="nav-item"
+        [class.selected]="activeView() === 'vacations'"
+        type="button"
+        (click)="showView('vacations')"
+      >
+        <span class="nav-icon">▣</span>
+        Vacaciones de empleados
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="status" [class.error]="connectionError()">
+        <span class="status-dot"></span>
+        {{ connectionStatus() }}
+      </span>
+    </div>
+  </aside>
+
+  <main class="shell">
+    <header class="topbar">
+      <div class="title-block">
+        <p class="eyebrow">Gerencia · Control interno</p>
+        <h1>
+          {{
+            activeView() === 'dashboard'
+              ? 'Dashboard'
+              : activeView() === 'employees'
+                ? 'Lista de empleados'
+                : 'Vacaciones de empleados'
+          }}
+        </h1>
+      </div>
+      <button class="logout-button" type="button" (click)="signOut()">Cerrar sesión</button>
+    </header>
+
+  @if (activeView() === 'dashboard') {
+    <section class="dashboard-welcome">
+      <div>
+        <p class="eyebrow">Hotel Solamar Inn · Resumen general</p>
+        <h2>Bienvenido al control general de empleados y vacaciones.</h2>
+        <p class="muted">
+          Consulta rápidamente el estado del personal y continúa con la gestión que necesites.
+        </p>
+      </div>
+      <span class="dashboard-date">{{ today | date: 'EEEE, d MMMM y' }}</span>
+    </section>
+
+    <section class="cards dashboard-cards" aria-label="Resumen general">
+      <article class="card">
+        <span class="card-label">Empleados activos</span>
+        <strong>{{ activeEmployees() }}</strong>
+        <span class="card-detail">Personal vigente</span>
+      </article>
+      <article class="card">
+        <span class="card-label">Vacaciones en curso</span>
+        <strong>{{ currentVacationEmployees() }}</strong>
+        <span class="card-detail">Empleados actualmente fuera</span>
+      </article>
+      <article class="card accent">
+        <span class="card-label">Estado del sistema</span>
+        <strong>{{ connectionStatus() }}</strong>
+        <span class="card-detail">{{ connectionError() || 'Base de datos disponible' }}</span>
+      </article>
+    </section>
+
+    <section class="dashboard-actions">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Accesos rápidos</p>
+          <h2>¿Qué deseas administrar?</h2>
+        </div>
+      </div>
+      <div class="quick-actions">
+        <button type="button" class="quick-action" (click)="showView('employees')">
+          <span class="quick-icon">♙</span>
+          <span><strong>Lista de empleados</strong><small>Consultar y administrar personal</small></span>
+          <span class="arrow">→</span>
+        </button>
+        <button type="button" class="quick-action" (click)="showView('vacations')">
+          <span class="quick-icon">▣</span>
+          <span><strong>Vacaciones de empleados</strong><small>Registrar y consultar vacaciones</small></span>
+          <span class="arrow">→</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="dashboard-widgets" aria-label="Indicadores adicionales">
+      <article class="dashboard-widget vacation-chart-card">
+        <div class="widget-heading">
+          <div>
+            <p class="eyebrow">Seguimiento</p>
+            <h2>Vacaciones del período</h2>
+          </div>
+          <span class="widget-total">{{ activeEmployees() }} empleados</span>
+        </div>
+        <div class="chart-content">
+          <div class="pie-chart" [style.background]="vacationPieStyle()" role="img" aria-label="Distribución de vacaciones"></div>
+          <div class="chart-legend">
+            <div><span class="legend-dot taken"></span><span>Ya tomaron vacaciones</span><strong>{{ employeesWithTakenVacation() }}</strong></div>
+            <div><span class="legend-dot pending"></span><span>Faltan por salir</span><strong>{{ employeesWithPendingVacation() }}</strong></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="dashboard-widget birthday-card">
+        <div class="widget-heading">
+          <div>
+            <p class="eyebrow">Celebraciones</p>
+            <h2>Cumpleañeros del mes</h2>
+          </div>
+          <span class="birthday-month">{{ today | date: 'MMMM' }}</span>
+        </div>
+        @if (monthlyBirthdays().length) {
+          <ul class="birthday-list">
+            @for (employee of monthlyBirthdays(); track employee.id) {
+              <li>
+                <span class="birthday-avatar">{{ employee.sex === 'Mujer' ? '♀' : '♂' }}</span>
+                <span><strong>{{ employee.fullName }}</strong><small>{{ employee.birthDate | date: 'dd' }} de {{ employee.birthDate | date: 'MMMM' }}</small></span>
+                <span class="birthday-cake">✦</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <div class="birthday-empty">
+            <span class="birthday-empty-icon">☆</span>
+            <p>No hay cumpleaños registrados este mes.</p>
+          </div>
+        }
+      </article>
+    </section>
+  } @else if (activeView() === 'employees') {
+  <section class="intro">
+    <div>
+      <p class="eyebrow">Hotel Solamar Inn · Resumen</p>
+      <h2>Una vista clara de tus empleados Y su información.</h2>
+      <p class="muted">
+        Administra el equipo del hotel y mantén el historial de vacaciones siempre disponible.
+      </p>
+    </div>
+    <button type="button" (click)="openEmployeeForm()">+ Agregar empleado</button>
+  </section>
+
+  @if (showEmployeeForm()) {
+    <section class="form-card" aria-labelledby="employee-form-title">
+      <div class="form-heading">
+        <div>
+          <p class="eyebrow">{{ editingEmployeeId ? 'Actualizar registro' : 'Nuevo registro' }}</p>
+          <h2 id="employee-form-title">
+            {{ editingEmployeeId ? 'Modificar empleado' : 'Agregar empleado' }}
+          </h2>
+        </div>
+        <button class="close-button" type="button" (click)="closeEmployeeForm()" aria-label="Cerrar">
+          ×
+        </button>
+      </div>
+
+      <form (ngSubmit)="saveEmployee()">
+        <label>
+          Nombre completo
+          <input
+            name="employeeName"
+            type="text"
+            [(ngModel)]="employeeName"
+            placeholder="Ej. Juan Pérez"
+            required
+          />
+        </label>
+        <label>
+          Puesto
+          <input
+            name="employeePosition"
+            type="text"
+            [(ngModel)]="employeePosition"
+            placeholder="Ej. Auxiliar administrativo"
+          />
+        </label>
+        <label>
+          Edad
+          <input
+            name="employeeAge"
+            type="number"
+            min="1"
+            max="120"
+            [(ngModel)]="employeeAge"
+            placeholder="Ej. 28"
+            required
+          />
+        </label>
+        <label>
+          Sexo
+          <select name="employeeSex" [(ngModel)]="employeeSex" required>
+            <option value="" disabled>Selecciona una opción</option>
+            <option value="Mujer">Mujer</option>
+            <option value="Hombre">Hombre</option>
+          </select>
+        </label>
+        <label>
+          Cumpleaños
+          <input name="employeeBirthDate" type="date" [(ngModel)]="employeeBirthDate" required />
+        </label>
+        <label>
+          Fecha de ingreso
+          <input name="employeeHireDate" type="date" [(ngModel)]="employeeHireDate" required />
+        </label>
+        <label>
+          Descanso semanal
+          <select name="employeeWeeklyRestDay" [(ngModel)]="employeeWeeklyRestDay" required>
+            <option [ngValue]="null" disabled>Selecciona un día</option>
+            <option [ngValue]="0">Domingo</option>
+            <option [ngValue]="1">Lunes</option>
+            <option [ngValue]="2">Martes</option>
+            <option [ngValue]="3">Miércoles</option>
+            <option [ngValue]="4">Jueves</option>
+            <option [ngValue]="5">Viernes</option>
+            <option [ngValue]="6">Sábado</option>
+          </select>
+        </label>
+        <div class="form-actions">
+          <button class="secondary-button" type="button" (click)="closeEmployeeForm()">Cancelar</button>
+          <button type="submit" [disabled]="isSavingEmployee()">
+            {{ isSavingEmployee() ? 'Guardando...' : editingEmployeeId ? 'Guardar cambios' : 'Guardar empleado' }}
+          </button>
+        </div>
+      </form>
+    </section>
+  }
+
+  @if (employeeSavedMessage()) {
+    <p class="connection-success" role="status">{{ employeeSavedMessage() }}</p>
+  }
+
+  <section class="cards" aria-label="Resumen de empleados">
+    <article class="card">
+      <span class="card-label">Empleados activos</span>
+      <strong>{{ activeEmployees() }}</strong>
+      <span class="card-detail">Empleados activos</span>
+    </article>
+    <article class="card">
+      <span class="card-label">Vacaciones registradas</span>
+      <strong>{{ vacationRecordCount() }}</strong>
+      <span class="card-detail">Registros guardados</span>
+    </article>
+    <article class="card accent">
+      <span class="card-label">Estado del sistema</span>
+      <strong>Conectado</strong>
+      <span class="card-detail">Base de datos disponible</span>
+    </article>
+  </section>
+
+  @if (connectionError()) {
+    <p class="connection-error" role="alert">{{ connectionError() }}</p>
+  }
+
+  <section class="employees-section" aria-labelledby="employees-title">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Directorio del hotel</p>
+        <h2 id="employees-title">Lista de empleados</h2>
+      </div>
+      <span class="record-count">{{ employees().length }} registros</span>
+    </div>
+
+    @if (employees().length) {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Empleado</th>
+              <th>Edad</th>
+              <th>Sexo</th>
+              <th>Puesto</th>
+              <th>Cumpleaños</th>
+              <th>Ingreso</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (employee of employees(); track employee.id) {
+              <tr>
+                <td>
+                  <div class="employee-cell">
+                    <span
+                      class="gender-avatar"
+                      [class.woman]="employee.sex === 'Mujer'"
+                      [attr.aria-label]="'Sexo: ' + employee.sex"
+                    >
+                      {{ employee.sex === 'Mujer' ? '♀' : '♂' }}
+                    </span>
+                    <strong>{{ employee.fullName }}</strong>
+                  </div>
+                </td>
+                <td>{{ employee.age }} años</td>
+                <td>{{ employee.sex }}</td>
+                <td>{{ employee.position || 'Sin puesto' }}</td>
+                <td>{{ employee.birthDate | date: 'dd/MM/yyyy' }}</td>
+                <td>{{ employee.hireDate | date: 'dd/MM/yyyy' }}</td>
+                <td>
+                  <span class="employee-status" [class.inactive]="!employee.active">
+                    {{ employee.active ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+                <td>
+                  <div class="actions">
+                    <button class="icon-button" type="button" (click)="viewEmployee(employee)" title="Ver empleado">
+                      ◉
+                    </button>
+                    <button class="icon-button" type="button" (click)="editEmployee(employee)" title="Modificar empleado">
+                      ✎
+                    </button>
+                    @if (employee.active) {
+                      <button
+                        class="icon-button danger"
+                        type="button"
+                        (click)="deleteEmployee(employee)"
+                        title="Eliminar empleado"
+                      >
+                        ×
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <div class="empty-icon">⌁</div>
+        <h2>Aún no hay empleados registrados</h2>
+        <p class="muted">Agrega el primer integrante del equipo del hotel para verlo aquí.</p>
+        <button type="button" (click)="openEmployeeForm()">Agregar primer empleado</button>
+      </div>
+    }
+  </section>
+
+  @if (selectedEmployee(); as employee) {
+    <div class="modal-backdrop" role="presentation" (click)="closeEmployeeDetails()">
+      <section class="details-modal" role="dialog" aria-modal="true" aria-labelledby="employee-details-title" (click)="$event.stopPropagation()">
+        <div class="form-heading">
+          <div>
+            <p class="eyebrow">Ficha del empleado</p>
+            <h2 id="employee-details-title">{{ employee.fullName }}</h2>
+          </div>
+          <button class="close-button" type="button" (click)="closeEmployeeDetails()" aria-label="Cerrar">×</button>
+        </div>
+        <dl class="details-grid">
+          <div><dt>Puesto</dt><dd>{{ employee.position || 'Sin puesto' }}</dd></div>
+          <div><dt>Edad</dt><dd>{{ employee.age }} años</dd></div>
+          <div><dt>Sexo</dt><dd>{{ employee.sex }}</dd></div>
+          <div><dt>Cumpleaños</dt><dd>{{ employee.birthDate | date: 'dd/MM/yyyy' }}</dd></div>
+          <div><dt>Fecha de ingreso</dt><dd>{{ employee.hireDate | date: 'dd/MM/yyyy' }}</dd></div>
+          <div><dt>Estado</dt><dd>{{ employee.active ? 'Activo' : 'Inactivo' }}</dd></div>
+        </dl>
+      </section>
+    </div>
+  }
+
+  } @else {
+    <section class="vacation-panel">
+      <div class="vacation-indicators">
+        <article class="card"><span class="card-label">Empleados activos</span><strong>{{ activeEmployees() }}</strong></article>
+        <article class="card"><span class="card-label">Días pendientes</span>        <strong>{{ pendingVacationDays() }}</strong></article>
+        <article class="card accent"><span class="card-label">Actualmente de vacaciones</span><strong>{{ currentVacationEmployees() }}</strong></article>
+      </div>
+      <div class="vacation-toolbar">
+        <input type="search" placeholder="Buscar empleado..." [ngModel]="vacationSearch()" (ngModelChange)="vacationSearch.set($event)" />
+        <select [ngModel]="vacationSexFilter()" (ngModelChange)="vacationSexFilter.set($event)">
+          <option value="">Todos los sexos</option><option value="Mujer">Mujer</option><option value="Hombre">Hombre</option>
+        </select>
+        <select [ngModel]="vacationTenureFilter()" (ngModelChange)="vacationTenureFilter.set($event)">
+          <option value="">Toda antigüedad</option><option value="new">Menos de 5 años</option><option value="experienced">5 años o más</option>
+        </select>
+        <select [ngModel]="vacationStatusFilter()" (ngModelChange)="vacationStatusFilter.set($event)">
+          <option value="">Todos los estados</option><option value="Al corriente">Al corriente</option><option value="Tiene días pendientes">Con días pendientes</option><option value="Actualmente de vacaciones">Actualmente de vacaciones</option><option value="Sin período vacacional generado">Sin período</option>
+        </select>
+        <select [ngModel]="vacationSort()" (ngModelChange)="vacationSort.set($event)">
+          <option value="hireDate">Ordenar por ingreso</option><option value="balance">Ordenar por saldo</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sexo</th><th>Empleado</th><th>Ingreso</th><th>Antigüedad</th><th>Correspondientes</th><th>Disfrutados</th><th>Saldo</th><th>Próximo aniversario</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>
+            @for (employee of vacationEmployees(); track employee.id) {
+              <tr>
+                <td>{{ employee.sex === 'Mujer' ? '♀' : '♂' }}</td><td><strong>{{ employee.fullName }}</strong></td>
+                <td>{{ employee.hireDate | date: 'dd/MM/yyyy' }}</td><td>{{ employeeTenure(employee) }}</td>
+                <td>{{ currentPeriod(employee)?.entitledDays ?? 0 }}</td><td>{{ enjoyedDays(employee) }}</td>
+                <td><strong>{{ currentPeriod(employee)?.remainingDays ?? 0 }}</strong></td>
+                <td>{{ nextAnniversary(employee) | date: 'dd/MM/yyyy' }}</td>
+                <td><span [class]="'employee-status vacation-status ' + vacationStatusClass(employee)">{{ vacationStatus(employee) }}</span></td>
+                <td><button class="action-button" type="button" (click)="openVacationFile(employee)">Administrar vacaciones</button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  }
+
+  @if (selectedVacationEmployee(); as employee) {
+    <div class="modal-backdrop" role="presentation" (click)="closeVacationFile()">
+      <section class="vacation-file" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+        <div class="form-heading">
+          <div><p class="eyebrow">Expediente vacacional</p><h2>{{ employee.fullName }}</h2></div>
+          <button class="close-button" type="button" (click)="closeVacationFile()" aria-label="Cerrar">×</button>
+        </div>
+        <div class="profile-summary">
+          <span>Ingreso <strong>{{ employee.hireDate | date: 'dd/MM/yyyy' }}</strong></span>
+          <span>Antigüedad <strong>{{ employeeTenure(employee) }}</strong></span>
+          <span>Descanso <strong>{{ ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][employee.weeklyRestDay ?? 0] }}</strong></span>
+          <span>Saldo <strong>{{ currentPeriod(employee)?.remainingDays ?? 0 }} días</strong></span>
+        </div>
+        <div class="period-table table-wrap">
+          <h3>Períodos vacacionales</h3>
+          <table>
+            <thead><tr><th>Período</th><th>Inicial</th><th>Final</th><th>Corresponden</th><th>Disfrutados</th><th>Programados</th><th>Restantes</th><th></th></tr></thead>
+            <tbody>
+              @for (period of employeePeriods(employee); track period.startDate) {
+                <tr><td>{{ period.number }}</td><td>{{ period.startDate | date: 'dd/MM/yyyy' }}</td><td>{{ period.endDate | date: 'dd/MM/yyyy' }}</td><td>{{ period.entitledDays }}</td><td>{{ period.enjoyedDays }}</td><td>{{ period.scheduledDays }}</td><td>{{ period.remainingDays }}</td><td><button class="small-action" type="button" (click)="startAdjustment(period)">Ajustar</button></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (adjustmentPeriod; as period) {
+          <form class="adjustment-form" (ngSubmit)="saveAdjustment(employee)">
+            <p class="eyebrow">Ajuste manual · Período {{ period.number }}</p>
+            <label>Días disfrutados<input name="adjustmentEnjoyedDays" type="number" min="0" [ngModel]="adjustmentEnjoyedDays" (ngModelChange)="updateAdjustmentEnjoyedDays($event)" required /></label>
+            <label>Días restantes<input name="adjustmentRemainingDays" type="number" min="0" [(ngModel)]="adjustmentRemainingDays" required /></label>
+            <label>Motivo<textarea name="adjustmentReason" rows="2" [(ngModel)]="adjustmentReason" required></textarea></label>
+            <div class="form-actions"><button class="secondary-button" type="button" (click)="cancelAdjustment()">Cancelar</button><button type="submit" [disabled]="adjustmentSaving">{{ adjustmentSaving ? 'Guardando...' : 'Guardar ajuste' }}</button></div>
+          </form>
+        }
+        @if (!vacationFormOpen()) {
+          <button type="button" (click)="startVacationForm()">Registrar vacaciones disfrutadas</button>
+        } @else {
+          <form class="vacation-form" (ngSubmit)="saveVacation()">
+            <p class="eyebrow">{{ editingVacationId ? 'Modificar vacación programada' : 'Nuevo movimiento' }}</p>
+            <label>Fecha de inicio<input name="vacationStartDate" type="date" [(ngModel)]="vacationStartDate" required /></label>
+            <label>Fecha de finalización<input name="vacationEndDate" type="date" [(ngModel)]="vacationEndDate" required /></label>
+            <label>Observaciones<textarea name="vacationNotes" [(ngModel)]="vacationNotes" rows="2"></textarea></label>
+            <p class="preview-days">
+              Días calculados: <strong>{{ vacationDaysPreview() }}</strong>
+              (días naturales, incluyendo descanso semanal)
+            </p>
+            <p class="available-days">
+              Saldo disponible: <strong>{{ vacationAvailableDays() }} días</strong>
+            </p>
+            @if (vacationFormError()) {
+              <p class="vacation-form-error" role="alert">{{ vacationFormError() }}</p>
+            }
+            <div class="form-actions">
+              <button class="secondary-button" type="button" (click)="vacationFormOpen.set(false)">Cancelar</button>
+              <button
+                type="submit"
+                [disabled]="vacationSaving || !!vacationFormError()"
+              >
+                {{ vacationSaving ? 'Guardando...' : editingVacationId ? 'Guardar cambios' : 'Confirmar registro' }}
+              </button>
+            </div>
+          </form>
+        }
+        <h3>Historial de movimientos</h3>
+        <ul class="movement-list">
+          @for (record of vacationEmployeeRecords(employee); track record.id) {
+            <li>
+              <span>{{ record.startDate | date: 'dd/MM/yyyy' }} – {{ record.endDate | date: 'dd/MM/yyyy' }}</span>
+              <strong>{{ record.daysTaken }} días</strong>
+              <small>{{ record.notes || 'Sin observaciones' }} · {{ record.recordStatus === 'scheduled' ? 'Programada' : record.recordStatus === 'enjoyed' ? 'Disfrutada' : 'Revertida' }}</small>
+              @if (record.recordStatus === 'scheduled') {
+                <span class="movement-actions">
+                  <button class="small-action" type="button" (click)="editScheduledVacation(record)">Modificar</button>
+                  <button class="small-action" type="button" (click)="markVacationAsEnjoyed(record)">Marcar disfrutada</button>
+                  <button class="small-action danger-action" type="button" (click)="cancelVacation(record)">Eliminar / cancelar</button>
+                </span>
+              } @else if (record.recordStatus === 'enjoyed') {
+                <button class="small-action danger-action" type="button" (click)="cancelVacation(record)">Eliminar / revertir</button>
+              }
+            </li>
+          } @empty { <li class="muted">Sin movimientos registrados.</li> }
+        </ul>
+      </section>
+    </div>
+  }
+</main>
+</div>
+}
+
+<router-outlet />
